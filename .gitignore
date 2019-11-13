@@ -1,0 +1,9 @@
+*.swp
+checkpoints
+checkpoints/*
+*/__pycache__/
+__pycache__/
+features/*
+features
+record/*
+record

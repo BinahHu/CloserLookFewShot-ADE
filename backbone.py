@@ -371,6 +371,18 @@ class ResNet(nn.Module):
         out = self.trunk(x)
         return out
 
+class LinearLayer(nn.Module):
+    def __init__(self, feat_dim = 4608, out_dim = 4608):
+        super(LinearLayer,self).__init__()
+        self.fc = nn.Linear(feat_dim, out_dim)
+        self.final_feat_dim = out_dim
+
+    def forward(self, x):
+        out = self.fc(x)
+        out = F.relu(x)
+        return out
+
+
 def Conv4():
     return ConvNet(4)
 
@@ -404,6 +416,5 @@ def ResNet50( flatten = True):
 def ResNet101( flatten = True):
     return ResNet(BottleneckBlock, [3,4,23,3],[256,512,1024,2048], flatten)
 
-
-
-
+def Linear( flatten = False):
+    return LinearLayer() 

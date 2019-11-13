@@ -52,14 +52,14 @@ class MatchingNet(MetaTemplate):
         G, G_normalized = self.encode_training_set( z_support)
 
         y_s         = torch.from_numpy(np.repeat(range( self.n_way ), self.n_support ))
-        Y_S         = Variable( utils.one_hot(y_s, self.n_way ) ).cuda()
+        Y_S         = utils.one_hot(y_s, self.n_way ).cuda()
         f           = z_query
         logprobs = self.get_logprobs(f, G, G_normalized, Y_S)
         return logprobs
 
     def set_forward_loss(self, x):
         y_query = torch.from_numpy(np.repeat(range( self.n_way ), self.n_query ))
-        y_query = Variable(y_query.cuda())
+        y_query = y_query.cuda()
 
         logprobs = self.set_forward(x)
 
@@ -75,7 +75,7 @@ class FullyContextualEmbedding(nn.Module):
         super(FullyContextualEmbedding, self).__init__()
         self.lstmcell = nn.LSTMCell(feat_dim*2, feat_dim)
         self.softmax = nn.Softmax()
-        self.c_0 = Variable(torch.zeros(1,feat_dim))
+        self.c_0 = torch.zeros(1,feat_dim)
         self.feat_dim = feat_dim
         #self.K = K
 

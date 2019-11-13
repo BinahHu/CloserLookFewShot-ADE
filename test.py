@@ -39,10 +39,16 @@ def feature_evaluation(cl_data_file, model, n_way = 5, n_support = 5, n_query = 
         scores  = model.set_forward_adaptation(z_all, is_feature = True)
     else:
         scores  = model.set_forward(z_all, is_feature = True)
-    pred = scores.data.cpu().numpy().argmax(axis = 1)
+    #pred = scores.data.cpu().numpy().argmax(axis = 1)
+    pred = np.argsort(scores.data.cpu().numpy(), axis = 1)
     y = np.repeat(range( n_way ), n_query )
-    acc = np.mean(pred == y)*100 
-    return acc
+    acc_cat = 0
+    for i in range(pred.shape[0]):
+        if y[i] in pred[i, -5 : ]:
+            acc_cat += 1
+    acc_cat = acc_cat / pred.shape[0] * 100
+    #acc = np.mean(pred == y)*100 
+    return acc_cat
 
 if __name__ == '__main__':
     params = parse_args('test')
@@ -51,7 +57,8 @@ if __name__ == '__main__':
 
     iter_num = 600
 
-    few_shot_params = dict(n_way = params.test_n_way , n_support = params.n_shot) 
+    #few_shot_params = dict(n_way = params.test_n_way , n_support = params.n_shot) 
+    few_shot_params = dict(n_way = 193 , n_support = params.n_shot) 
 
     if params.dataset in ['omniglot', 'cross_char']:
         assert params.model == 'Conv4' and not params.train_aug ,'omniglot only support Conv4 without augmentation'
@@ -148,7 +155,8 @@ if __name__ == '__main__':
         cl_data_file = feat_loader.init_loader(novel_file)
 
         for i in range(iter_num):
-            acc = feature_evaluation(cl_data_file, model, n_query = 15, adaptation = params.adaptation, **few_shot_params)
+            print(i)
+            acc = feature_evaluation(cl_data_file, model, n_query = 1, adaptation = params.adaptation, **few_shot_params)
             acc_all.append(acc)
 
         acc_all  = np.asarray(acc_all)

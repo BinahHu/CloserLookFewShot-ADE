@@ -20,7 +20,6 @@ class ProtoNet(MetaTemplate):
         z_support   = z_support.contiguous()
         z_proto     = z_support.view(self.n_way, self.n_support, -1 ).mean(1) #the shape of z is [n_data, n_dim]
         z_query     = z_query.contiguous().view(self.n_way* self.n_query, -1 )
-
         dists = euclidean_dist(z_query, z_proto)
         scores = -dists
         return scores
@@ -28,7 +27,7 @@ class ProtoNet(MetaTemplate):
 
     def set_forward_loss(self, x):
         y_query = torch.from_numpy(np.repeat(range( self.n_way ), self.n_query ))
-        y_query = Variable(y_query.cuda())
+        y_query = y_query.cuda()
 
         scores = self.set_forward(x)
 

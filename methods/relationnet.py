@@ -14,7 +14,7 @@ class RelationNet(MetaTemplate):
         super(RelationNet, self).__init__(model_func,  n_way, n_support)
 
         self.loss_type = loss_type  #'softmax'# 'mse'
-        self.relation_module = RelationModule( self.feat_dim , 8, self.loss_type ) #relation net features are not pooled, so self.feat_dim is [dim, w, h] 
+        self.relation_module = RelationModule( self.feat_dim , 256, self.loss_type ) #relation net features are not pooled, so self.feat_dim is [dim, w, h] 
 
         if self.loss_type == 'mse':
             self.loss_fn = nn.MSELoss()  
@@ -25,16 +25,16 @@ class RelationNet(MetaTemplate):
         z_support, z_query  = self.parse_feature(x,is_feature)
 
         z_support   = z_support.contiguous()
-        z_proto     = z_support.view( self.n_way, self.n_support, *self.feat_dim ).mean(1) 
-        z_query     = z_query.contiguous().view( self.n_way* self.n_query, *self.feat_dim )
+        z_proto     = z_support.view( self.n_way, self.n_support, self.feat_dim ).mean(1) 
+        z_query     = z_query.contiguous().view( self.n_way* self.n_query, self.feat_dim )
 
         
-        z_proto_ext = z_proto.unsqueeze(0).repeat(self.n_query* self.n_way,1,1,1,1)
-        z_query_ext = z_query.unsqueeze(0).repeat( self.n_way,1,1,1,1)
+        z_proto_ext = z_proto.unsqueeze(0).repeat(self.n_query* self.n_way,1,1)
+        z_query_ext = z_query.unsqueeze(0).repeat( self.n_way,1,1)
         z_query_ext = torch.transpose(z_query_ext,0,1)
-        extend_final_feat_dim = self.feat_dim.copy()
-        extend_final_feat_dim[0] *= 2
-        relation_pairs = torch.cat((z_proto_ext,z_query_ext),2).view(-1, *extend_final_feat_dim)
+        extend_final_feat_dim = self.feat_dim
+        extend_final_feat_dim *= 2
+        relation_pairs = torch.cat((z_proto_ext,z_query_ext),2).view(-1, extend_final_feat_dim)
         relations = self.relation_module(relation_pairs).view(-1, self.n_way)
 
         return relations
@@ -43,7 +43,7 @@ class RelationNet(MetaTemplate):
         assert is_feature == True, 'Finetune only support fixed feature' 
         full_n_support = self.n_support
         full_n_query = self.n_query
-        relation_module_clone = RelationModule( self.feat_dim , 8, self.loss_type )
+        relation_module_clone = RelationModule( self.feat_dim , 256, self.loss_type )
         relation_module_clone.load_state_dict(self.relation_module.state_dict())
  
 
@@ -66,25 +66,25 @@ class RelationNet(MetaTemplate):
             scores = self.set_forward(sub_x, is_feature = True)
             if self.loss_type == 'mse':
                 y_oh = utils.one_hot(y, self.n_way)
-                y_oh = Variable(y_oh.cuda())            
+                y_oh = y_oh.cuda()          
 
                 loss =  self.loss_fn(scores, y_oh )
             else:
-                y = Variable(y.cuda())
+                y = y.cuda()
                 loss = self.loss_fn(scores, y )
             loss.backward()
             set_optimizer.step()
 
         self.n_support = full_n_support
         self.n_query = full_n_query
-        z_proto     = z_support.view( self.n_way, self.n_support, *self.feat_dim ).mean(1) 
-        z_query     = z_query.contiguous().view( self.n_way* self.n_query, *self.feat_dim )
+        z_proto     = z_support.view( self.n_way, self.n_support, self.feat_dim ).mean(1) 
+        z_query     = z_query.contiguous().view( self.n_way* self.n_query, self.feat_dim )
 
         
         z_proto_ext = z_proto.unsqueeze(0).repeat(self.n_query* self.n_way,1,1,1,1)
         z_query_ext = z_query.unsqueeze(0).repeat( self.n_way,1,1,1,1)
         z_query_ext = torch.transpose(z_query_ext,0,1)
-        extend_final_feat_dim = self.feat_dim.copy()
+        extend_final_feat_dim = self.feat_dim
         extend_final_feat_dim[0] *= 2
         relation_pairs = torch.cat((z_proto_ext,z_query_ext),2).view(-1, *extend_final_feat_dim)
         relations = self.relation_module(relation_pairs).view(-1, self.n_way)
@@ -97,11 +97,11 @@ class RelationNet(MetaTemplate):
         scores = self.set_forward(x)
         if self.loss_type == 'mse':
             y_oh = utils.one_hot(y, self.n_way)
-            y_oh = Variable(y_oh.cuda())            
+            y_oh = y_oh.cuda()          
 
             return self.loss_fn(scores, y_oh )
         else:
-            y = Variable(y.cuda())
+            y = y.cuda()
             return self.loss_fn(scores, y )
 
 class RelationConvBlock(nn.Module):
@@ -131,21 +131,28 @@ class RelationModule(nn.Module):
         super(RelationModule, self).__init__()
 
         self.loss_type = loss_type
-        padding = 1 if ( input_size[1] <10 ) and ( input_size[2] <10 ) else 0 # when using Resnet, conv map without avgpooling is 7x7, need padding in block to do pooling
+        #padding = 1 if ( input_size[1] <10 ) and ( input_size[2] <10 ) else 0 # when using Resnet, conv map without avgpooling is 7x7, need padding in block to do pooling
 
-        self.layer1 = RelationConvBlock(input_size[0]*2, input_size[0], padding = padding )
-        self.layer2 = RelationConvBlock(input_size[0], input_size[0], padding = padding )
+        #self.layer1 = RelationConvBlock(input_size[0]*2, input_size[0], padding = padding )
+        #self.layer2 = RelationConvBlock(input_size[0], input_size[0], padding = padding )
 
-        shrink_s = lambda s: int((int((s- 2 + 2*padding)/2)-2 + 2*padding)/2)
+        #shrink_s = lambda s: int((int((s- 2 + 2*padding)/2)-2 + 2*padding)/2)
 
-        self.fc1 = nn.Linear( input_size[0]* shrink_s(input_size[1]) * shrink_s(input_size[2]), hidden_size )
+        #self.fc1 = nn.Linear( input_size[0]* shrink_s(input_size[1]) * shrink_s(input_size[2]), hidden_size )
+        self.fc1 = nn.Linear( input_size * 2, hidden_size)
+        #self.fc1 = nn.Linear( input_size * 2, 4096)
+        #self.fc11 = nn.Linear( 4096, 1024)
+        #self.fc12 = nn.Linear( 1024, hidden_size)
         self.fc2 = nn.Linear( hidden_size,1)
 
     def forward(self,x):
-        out = self.layer1(x)
-        out = self.layer2(out)
-        out = out.view(out.size(0),-1)
+        #out = self.layer1(x)
+        #out = self.layer2(out)
+        #out = out.view(out.size(0),-1)
+        out = x
         out = F.relu(self.fc1(out))
+        #out = F.relu(self.fc11(out))
+        #out = F.relu(self.fc12(out))
         if self.loss_type == 'mse':
             out = F.sigmoid(self.fc2(out))
         elif self.loss_type == 'softmax':
